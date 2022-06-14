@@ -209,15 +209,20 @@ static void usage(FILE *file, const char *prgname, const char *iface)
     "                 : print capabilities and terminate\n"
     "--print-states\n"
     "                 : print existing TPM states and terminate\n"
+#ifdef HAVE_LIBTPMS_SETPROFILE_API
+    "--profile name=<name>\n"
+    "                 : Set a profile on the TPM 2\n"
+#endif
     "-h|--help        : display this help screen and terminate\n"
     "\n",
     prgname, iface);
 }
 
-static void swtpm_cleanup(struct ctrlchannel *cc)
+static void swtpm_cleanup(struct mainLoopParams *mlp)
 {
+    free(mlp->json_profile);
     pidfile_remove();
-    ctrlchannel_free(cc);
+    ctrlchannel_free(mlp->cc);
     log_global_free();
     tpmstate_global_free();
     SWTPM_NVRAM_Shutdown();
@@ -287,6 +292,7 @@ int swtpm_chardev_main(int argc, char **argv, const char *prgname, const char *i
     char *flagsdata = NULL;
     char *seccompdata = NULL;
     char *runas = NULL;
+    char *profiledata = NULL;
 #ifdef WITH_VTPM_PROXY
     bool use_vtpm_proxy = false;
 #endif
@@ -321,6 +327,9 @@ int swtpm_chardev_main(int argc, char **argv, const char *prgname, const char *i
         {"print-capabilities"
                      ,       no_argument, 0, 'a'},
         {"print-states",     no_argument, 0, 'e'},
+#ifdef HAVE_LIBTPMS_SETPROFILE_API
+        {"profile"   , required_argument, 0, 'R'},
+#endif
         {NULL        , 0                , 0, 0  },
     };
 
@@ -450,6 +459,10 @@ int swtpm_chardev_main(int argc, char **argv, const char *prgname, const char *i
             seccompdata = optarg;
             break;
 
+        case 'R':
+            profiledata = optarg;
+            break;
+
         default:
             usage(stderr, prgname, iface);
             exit(EXIT_FAILURE);
@@ -531,7 +544,8 @@ int swtpm_chardev_main(int argc, char **argv, const char *prgname, const char *i
         handle_tpmstate_options(tpmstatedata) < 0 ||
         handle_seccomp_options(seccompdata, &seccomp_action) < 0 ||
         handle_flags_options(flagsdata, &need_init_cmd,
-                             &mlp.startupType) < 0) {
+                             &mlp.startupType) < 0 ||
+        handle_profile_options(profiledata, &mlp.json_profile) < 0) {
         goto exit_failure;
     }
 
@@ -554,7 +568,7 @@ int swtpm_chardev_main(int argc, char **argv, const char *prgname, const char *i
         goto error_no_tpm;
 
     if (!need_init_cmd) {
-        if ((rc = tpmlib_start(0, mlp.tpmversion)))
+        if ((rc = tpmlib_start(0, mlp.tpmversion, mlp.json_profile)))
             goto error_no_tpm;
         tpm_running = true;
     }
@@ -589,7 +603,7 @@ error_no_tpm:
     close(notify_fd[1]);
     notify_fd[1] = -1;
 
-    swtpm_cleanup(mlp.cc);
+    swtpm_cleanup(&mlp);
 
     /* Fatal initialization errors cause the program to abort */
     if (rc == 0) {
@@ -601,12 +615,12 @@ error_no_tpm:
     }
 
 exit_failure:
-    swtpm_cleanup(mlp.cc);
+    swtpm_cleanup(&mlp);
 
     exit(EXIT_FAILURE);
 
 exit_success:
-    swtpm_cleanup(mlp.cc);
+    swtpm_cleanup(&mlp);
 
     exit(EXIT_SUCCESS);
 }
