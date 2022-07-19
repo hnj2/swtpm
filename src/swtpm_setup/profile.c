@@ -17,7 +17,7 @@
 #ifdef HAVE_LIBTPMS_SETPROFILE_API
 
 /* Return the names of the supported profiles */
-static int get_profile_names(const gchar *swtpm_capabilities_json, gchar ***profile_names)
+int get_profile_names(const gchar *swtpm_capabilities_json, gchar ***profile_names)
 {
     g_autoptr(GError) error = NULL;
     JsonParser *jp = NULL;
@@ -71,7 +71,7 @@ error_str_array_free:
 
 #else
 
-static int get_profile_names(const gchar *swtpm_capabilities_json, gchar ***profile_names)
+int get_profile_names(const gchar *swtpm_capabilities_json, gchar ***profile_names)
 {
     *profile_names = g_malloc0(1 * sizeof(char *));
 
