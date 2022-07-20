@@ -37,8 +37,12 @@
 
 #include "config.h"
 
+#include <string.h>
+
 #include "fips.h"
 #include "logging.h"
+#include "utils.h"
+#include "swtpm_utils.h"
 
 #if defined(HAVE_OPENSSL_FIPS_H)
 # include <openssl/fips.h>
@@ -103,3 +107,55 @@ int fips_mode_disable(void)
     return 0;
 }
 #endif
+
+/* list of FIPS-disabled algorithms that TPM 2 may enabled */
+static const char *fips_disabled[] = {
+    "camellia",
+    "rsapss",
+    "sha1",
+    "tdes",
+};
+
+/* list of minimum required key sizes for FIPS */
+static const struct key_sizes {
+    const char *keyword;
+    unsigned int min_size;
+} key_sizes[] = {
+    {
+        .keyword = "rsa-min-size=",
+        .min_size = 2048,
+    }, {
+        .keyword = "ecc-min-size=",
+        .min_size = 224,
+    }
+};
+
+/* Determine whether any of the algorithms in the array are FIPS-disable */
+bool fips_algorithms_are_disabled(gchar *const*algorithms)
+{
+    bool found = false;
+    size_t i, l;
+    int j;
+    unsigned long v;
+
+    for (i = 0; i < ARRAY_LEN(fips_disabled); i++) {
+        if (strv_strncmp(algorithms, fips_disabled[i], -1) >= 0) {
+            found = true;
+            break;
+        }
+    }
+
+    for (i = 0; i < ARRAY_LEN(key_sizes); i++) {
+        l = strlen(key_sizes[i].keyword);
+        j = strv_strncmp(algorithms, key_sizes[i].keyword, l);
+        if (j >= 0) {
+            /* trusting value from libtpms is well formatted avoiding checks */
+            v = strtoul(&(algorithms[j][l]), NULL, 10);
+            if (v < key_sizes[i].min_size) {
+                found = true;
+                break;
+            }
+        }
+    }
+    return found;
+}

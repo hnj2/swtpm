@@ -48,6 +48,8 @@
 #include <libtpms/tpm_nvfilename.h>
 #include <libtpms/tpm_memory.h>
 
+#include <json-glib/json-glib.h>
+
 #include "tpmlib.h"
 #include "logging.h"
 #include "tpm_ioctl.h"
@@ -105,6 +107,64 @@ TPM_RESULT tpmlib_choose_tpm_version(TPMLIB_TPMVersion tpmversion)
     return res;
 }
 
+/* This function only applies to TPM2: If FIPS mode was enabled on the host,
+ * determine whether OpenSSL needs to deactivate FIPS mode. It doesn't need
+ * to deactivate it if a profile was chosen that has no algorithms that FIPS
+ * deactivates, otherwise it has to deactivate FIPS mode in the OpenSSL
+ * instance being used.
+ */
+static bool tpmlib_check_need_disable_fips_mode(void)
+{
+    char *info_data = TPMLIB_GetInfo(/*TPMLIB_INFO_RUNTIME_ALGORITHMS*/ 8);
+    g_autofree gchar *enabled = NULL;
+    bool need_disable = false;
+    gchar **algorithms;
+    int ret;
+
+    ret = json_get_submap_value(info_data, "RuntimeAlgorithms", "Enabled",
+                                &enabled);
+    if (ret) {
+        need_disable = true;
+        goto error;
+    }
+
+    algorithms = g_strsplit(enabled, ",", -1);
+
+    need_disable = fips_algorithms_are_disabled(algorithms);
+
+    fprintf(stderr, "oooo need_disable: %d\n", need_disable);
+
+    g_strfreev(algorithms);
+error:
+    free(info_data);
+
+    return need_disable;
+}
+
+/* Determine wheter FIPS mode is enabled in the crypto library. If FIPS mode is
+ * enabled check wether any of the algorithms that the TPM 2 uses would need
+ * FIPS mode to be disabled for the TPM 2 to work and try to disable it.
+ */
+static int tpmlib_maybe_disable_fips_mode(TPMLIB_TPMVersion tpmversion)
+{
+    bool disable_fips = false;
+    int ret = 0;
+
+    if (/*fips_mode_enabled() && */ 1) {
+        switch (tpmversion) {
+        case TPMLIB_TPM_VERSION_1_2:
+            disable_fips = true;
+            break;
+        case TPMLIB_TPM_VERSION_2:
+            disable_fips = tpmlib_check_need_disable_fips_mode();
+            break;
+        }
+        if (disable_fips && fips_mode_disable())
+            ret = 1;
+    }
+    return ret;
+}
+
 TPM_RESULT tpmlib_start(uint32_t flags, TPMLIB_TPMVersion tpmversion,
                         const char *json_profile)
 {
@@ -142,7 +202,7 @@ TPM_RESULT tpmlib_start(uint32_t flags, TPMLIB_TPMVersion tpmversion,
         }
     }
 
-    if (fips_mode_disable() < 0)
+    if (tpmlib_maybe_disable_fips_mode(tpmversion))
         goto error_terminate;
 
     return TPM_SUCCESS;
