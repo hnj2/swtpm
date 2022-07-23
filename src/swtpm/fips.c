@@ -54,6 +54,16 @@ extern int FIPS_mode_set(int);
 
 #include <openssl/err.h>
 
+bool fips_mode_enabled(void)
+{
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    int mode = EVP_default_properties_is_fips_enabled(NULL);
+#else
+    int mode = FIPS_mode();
+#endif
+    return mode != 0;
+}
+
 /*
  * disable_fips_mode: If possible, disable FIPS mode to avoid libtpms failures
  *
@@ -65,14 +75,9 @@ extern int FIPS_mode_set(int);
 #if defined(HAVE_OPENSSL_FIPS_H) || defined(HAVE_OPENSSL_FIPS_MODE_SET_API)
 int fips_mode_disable(void)
 {
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L
-    int mode = EVP_default_properties_is_fips_enabled(NULL);
-#else
-    int mode = FIPS_mode();
-#endif
     int ret = 0;
 
-    if (mode != 0) {
+    if (fips_mode_enabled()) {
 #if OPENSSL_VERSION_NUMBER >= 0x30000000L
         int rc = EVP_default_properties_enable_fips(NULL, 0);
 #else
