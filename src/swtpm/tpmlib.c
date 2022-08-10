@@ -118,7 +118,7 @@ TPM_RESULT tpmlib_start(uint32_t flags, TPMLIB_TPMVersion tpmversion,
         return res;
     }
 
-    if (lock_nvram && (res = SWTPM_NVRAM_Lock()) != TPM_SUCCESS)
+    if (lock_nvram && (res = SWTPM_NVRAM_Lock(0)) != TPM_SUCCESS)
         goto error_terminate;
 
     if (flags & PTM_INIT_FLAG_DELETE_VOLATILE) {

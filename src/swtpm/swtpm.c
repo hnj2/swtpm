@@ -479,7 +479,8 @@ int swtpm_main(int argc, char **argv, const char *prgname, const char *iface)
         handle_seccomp_options(seccompdata, &seccomp_action) < 0 ||
         handle_flags_options(flagsdata, &need_init_cmd,
                              &mlp.startupType) < 0 ||
-        handle_migration_options(migrationdata, &mlp.incoming_migration) < 0) {
+        handle_migration_options(migrationdata, &mlp.incoming_migration,
+                                 &mlp.release_lock_outgoing) < 0) {
         goto exit_failure;
     }
 
