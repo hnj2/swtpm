@@ -183,6 +183,8 @@ static void usage(FILE *file, const char *prgname, const char *iface)
     "                 : Choose the action of the seccomp profile when a\n"
     "                   blacklisted syscall is executed; default is kill\n"
 #endif
+    "--migration [incoming]\n"
+    "                 : Incoming migration will defer locking of NVRAM storage\n"
     "--print-capabilites\n"
     "                 : print capabilities and terminate\n"
     "--print-states\n"
@@ -215,6 +217,8 @@ int swtpm_main(int argc, char **argv, const char *prgname, const char *iface)
         .locality_flags = 0,
         .tpmversion = TPMLIB_TPM_VERSION_1_2,
         .startupType = _TPM_ST_NONE,
+        .incoming_migration = false,
+        .nvram_locked = false,
     };
     struct server *server = NULL;
     unsigned long val;
@@ -230,6 +234,7 @@ int swtpm_main(int argc, char **argv, const char *prgname, const char *iface)
     char *serverdata = NULL;
     char *flagsdata = NULL;
     char *seccompdata = NULL;
+    char *migrationdata = NULL;
     char *runas = NULL;
     bool need_init_cmd = true;
 #ifdef DEBUG
@@ -258,6 +263,7 @@ int swtpm_main(int argc, char **argv, const char *prgname, const char *iface)
 #ifdef WITH_SECCOMP
         {"seccomp"   , required_argument, 0, 'S'},
 #endif
+        {"migration" , required_argument, 0, 'i'},
         {"print-capabilities"
                      ,       no_argument, 0, 'a'},
         {"print-states",     no_argument, 0, 'e'},
@@ -399,6 +405,10 @@ int swtpm_main(int argc, char **argv, const char *prgname, const char *iface)
             seccompdata = optarg;
             break;
 
+        case 'i':
+            migrationdata = optarg;
+            break;
+
         default:
             usage(stderr, prgname, iface);
             exit(EXIT_FAILURE);
@@ -468,7 +478,8 @@ int swtpm_main(int argc, char **argv, const char *prgname, const char *iface)
         handle_tpmstate_options(tpmstatedata) < 0 ||
         handle_seccomp_options(seccompdata, &seccomp_action) < 0 ||
         handle_flags_options(flagsdata, &need_init_cmd,
-                             &mlp.startupType) < 0) {
+                             &mlp.startupType) < 0 ||
+        handle_migration_options(migrationdata, &mlp.incoming_migration) < 0) {
         goto exit_failure;
     }
 
@@ -505,7 +516,9 @@ int swtpm_main(int argc, char **argv, const char *prgname, const char *iface)
         goto error_no_tpm;
 
     if (!need_init_cmd) {
-        if ((rc = tpmlib_start(0, mlp.tpmversion)))
+        mlp.nvram_locked = !mlp.incoming_migration;
+
+        if ((rc = tpmlib_start(0, mlp.tpmversion, mlp.nvram_locked)))
             goto error_no_tpm;
         tpm_running = true;
     }

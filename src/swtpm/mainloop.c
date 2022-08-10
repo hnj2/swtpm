@@ -66,6 +66,7 @@
 #include "sys_dependencies.h"
 #include "compiler_dependencies.h"
 #include "swtpm_utils.h"
+#include "swtpm_nvstore.h"
 
 /* local variables */
 static TPM_MODIFIER_INDICATOR locality;
@@ -80,6 +81,27 @@ mainloop_cb_get_locality(TPM_MODIFIER_INDICATOR *loc,
     *loc = locality;
 
     return TPM_SUCCESS;
+}
+
+/* ensure that the NVRAM is locked; returns true in case of failure */
+bool mainloop_ensure_locked_nvram(struct mainLoopParams *mlp)
+{
+    TPM_RESULT res;
+
+    if (mlp->nvram_locked)
+        return false;
+
+    /* if NVRAM hasn't been initialized yet locking may need to be retried */
+    res = SWTPM_NVRAM_Lock();
+    if (res == TPM_RETRY)
+        return false;
+    if (res != TPM_SUCCESS)
+        return true;
+
+    mlp->nvram_locked = true;
+    mlp->incoming_migration = false;
+
+    return false;
 }
 
 int mainLoop(struct mainLoopParams *mlp,
@@ -237,6 +259,10 @@ int mainLoop(struct mainLoopParams *mlp,
 
             if (!(pollfds[DATA_CLIENT_FD].revents & POLLIN))
                 continue;
+
+            /* before processing a command ensure that the NVRAM is locked */
+            if ((mainloop_terminate = mainloop_ensure_locked_nvram(mlp)))
+                break;
 
             /* Read the command.  The number of bytes is determined by 'paramSize' in the stream */
             if (rc == 0) {

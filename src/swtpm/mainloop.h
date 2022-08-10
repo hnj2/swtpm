@@ -60,11 +60,16 @@ struct mainLoopParams {
     uint32_t locality_flags;
     TPMLIB_TPMVersion tpmversion;
     uint16_t startupType; /* use TPM 1.2 types */
+    /* whether to defer locking NVRAM storage due to incoming migration */
+    bool incoming_migration;
+    /* whether NVRAM storage is is currently locked */
+    bool nvram_locked;
 };
 
 int mainLoop(struct mainLoopParams *mlp,
              int notify_fd);
 TPM_RESULT mainloop_cb_get_locality(TPM_MODIFIER_INDICATOR *loc,
                                     uint32_t tpmnum);
+bool mainloop_ensure_locked_nvram(struct mainLoopParams *mlp);
 
 #endif /* _SWTPM_MAINLOOP_H_ */
