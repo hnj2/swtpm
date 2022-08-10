@@ -146,7 +146,7 @@ int capabilities_print_json(bool cusetpm, TPMLIB_TPMVersion tpmversion)
          "{ "
          "\"type\": \"swtpm\", "
          "\"features\": [ "
-             "%s%s%s%s%s%s%s%s%s%s%s"
+             "%s%s%s%s%s%s%s%s%s%s%s%s"
           " ], "
          "\"version\": \"" VERSION "\" "
          "}",
@@ -158,6 +158,7 @@ int capabilities_print_json(bool cusetpm, TPMLIB_TPMVersion tpmversion)
          true         ? "\"cmdarg-key-fd\", "          : "",
          true         ? "\"cmdarg-pwd-fd\", "          : "",
          true         ? "\"cmdarg-print-states\", "    : "",
+         true         ? "\"cmdarg-migration\", "       : "",
          nvram_backend_dir,
          nvram_backend_file,
          keysizecaps  ? keysizecaps                    : ""

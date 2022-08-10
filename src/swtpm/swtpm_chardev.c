@@ -205,8 +205,10 @@ static void usage(FILE *file, const char *prgname, const char *iface)
     "                 : Choose the action of the seccomp profile when a\n"
     "                   blacklisted syscall is executed; default is kill\n"
 #endif
-    "--migration [incoming]\n"
+    "--migration [incoming][,release-lock-outgoing]\n"
     "                 : Incoming migration will defer locking of NVRAM storage\n"
+    "                   Release-lock-outgoing will release the NVRAM lock on\n"
+    "                   outgoing migration\n"
     "--print-capabilites\n"
     "                 : print capabilities and terminate\n"
     "--print-states\n"
