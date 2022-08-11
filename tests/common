@@ -915,3 +915,21 @@ function skip_test_linked_with_asan()
 		fi
 	fi
 }
+
+function check_swtpm_no_storage_lock()
+{
+	if [ -n "$(ls -l /proc/${1}/fd | grep -E "\.lock\$")" ]; then
+		echo "Error: swtpm must not have storage locked"
+		ls -l /proc/${1}/fd
+		exit 1
+	fi
+}
+
+function check_swtpm_storage_locked()
+{
+	if [ -z "$(ls -l /proc/${1}/fd | grep -E "\.lock\$")" ]; then
+		echo "Error: swtpm must have storage locked"
+		ls -l /proc/${1}/fd
+		exit 1
+	fi
+}
